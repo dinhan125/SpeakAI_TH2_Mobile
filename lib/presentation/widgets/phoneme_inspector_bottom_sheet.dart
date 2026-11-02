@@ -263,7 +263,7 @@ class PhonemeInspectorBottomSheet extends StatelessWidget {
                   avatar: const Icon(Icons.volume_up_rounded, size: 16),
                   onPressed: () {
                     HapticHelper.lightImpact();
-                    AudioPlayerService.instance.speakNativeText(pw);
+                    AudioPlayerService.instance.speakNativeWithSpeed(pw, speed: 0.85);
                   },
                 );
               }).toList(),
@@ -279,7 +279,7 @@ class PhonemeInspectorBottomSheet extends StatelessWidget {
                 child: OutlinedButton.icon(
                   onPressed: () {
                     HapticHelper.lightImpact();
-                    AudioPlayerService.instance.speakNativeText(word);
+                    AudioPlayerService.instance.speakNativeWithSpeed(word, speed: 0.85);
                   },
                   icon: const Icon(Icons.volume_up_rounded, size: 18),
                   label: const Text('Nghe mẫu từ'),

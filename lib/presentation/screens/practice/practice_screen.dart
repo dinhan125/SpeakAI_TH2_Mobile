@@ -528,42 +528,74 @@ class _PracticeScreenState extends State<PracticeScreen> {
 
                     const SizedBox(height: AppSpacing.md),
 
-                    // 3-Speed Audio Playback Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    // Multi-Speed Audio Playback Controls
+                    Wrap(
+                      alignment: WrapAlignment.center,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
+                        // 1.0x Normal Speed
                         ElevatedButton.icon(
                           onPressed: () {
                             HapticHelper.lightImpact();
                             practice.playSampleNativeAudio();
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                            backgroundColor: practice.playbackSpeed == 1.0
+                                ? AppColors.primary
+                                : AppColors.primarySoft,
+                            foregroundColor: practice.playbackSpeed == 1.0
+                                ? Colors.white
+                                : AppColors.primaryDark,
+                            elevation: practice.playbackSpeed == 1.0 ? 1 : 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusPill)),
                           ),
-                          icon: const Icon(Icons.volume_up_rounded, size: 17),
+                          icon: const Icon(Icons.volume_up_rounded, size: 16),
                           label: const Text('Chuẩn (1.0x)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                         ),
-                        const SizedBox(width: 8),
-                        OutlinedButton.icon(
+                        // 0.75x Slow Speed
+                        ElevatedButton.icon(
                           onPressed: () {
                             HapticHelper.lightImpact();
                             practice.playSampleNativeAudioSlow();
                           },
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.primaryDark,
-                            backgroundColor: AppColors.primarySoft,
-                            side: BorderSide.none,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: practice.playbackSpeed == 0.75
+                                ? AppColors.primary
+                                : AppColors.primarySoft,
+                            foregroundColor: practice.playbackSpeed == 0.75
+                                ? Colors.white
+                                : AppColors.primaryDark,
+                            elevation: practice.playbackSpeed == 0.75 ? 1 : 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusPill)),
                           ),
-                          icon: const Icon(Icons.speed_rounded, size: 17),
-                          label: const Text('Chậm (0.7x)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                          icon: const Icon(Icons.speed_rounded, size: 16),
+                          label: const Text('Chậm (0.75x)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                        ),
+                        // 0.5x Very Slow Speed (Clearly audible & distinct phonemes)
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            HapticHelper.lightImpact();
+                            practice.playSampleNativeAudioVerySlow();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: practice.playbackSpeed == 0.5
+                                ? AppColors.primary
+                                : AppColors.primarySoft,
+                            foregroundColor: practice.playbackSpeed == 0.5
+                                ? Colors.white
+                                : AppColors.primaryDark,
+                            elevation: practice.playbackSpeed == 0.5 ? 1 : 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusPill)),
+                          ),
+                          icon: const Icon(Icons.slow_motion_video_rounded, size: 16),
+                          label: const Text('Rất chậm (0.5x)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                         ),
                         if (practice.lastRecordedAudioPath != null) ...[
-                          const SizedBox(width: 8),
                           ElevatedButton.icon(
                             onPressed: () {
                               HapticHelper.lightImpact();
@@ -574,10 +606,10 @@ class _PracticeScreenState extends State<PracticeScreen> {
                               foregroundColor: AppColors.streakOrangeText,
                               elevation: 0,
                               side: const BorderSide(color: AppColors.streakOrangeBorder),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppSpacing.radiusPill)),
                             ),
-                            icon: const Icon(Icons.headphones_rounded, size: 17),
+                            icon: const Icon(Icons.headphones_rounded, size: 16),
                             label: const Text('Giọng bạn', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                           ),
                         ],

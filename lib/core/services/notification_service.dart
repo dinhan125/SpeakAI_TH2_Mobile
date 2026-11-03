@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -49,6 +50,7 @@ class NotificationService {
 
   /// Request runtime permissions on Android 13+ and iOS
   Future<bool> requestPermissions() async {
+    if (kIsWeb) return true;
     try {
       final androidImplementation = _notificationsPlugin
           .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
@@ -100,33 +102,51 @@ class NotificationService {
         icon: '@mipmap/ic_launcher',
       );
 
-      const darwinDetails = DarwinNotificationDetails();
+      const iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
 
       const notificationDetails = NotificationDetails(
         android: androidDetails,
-        iOS: darwinDetails,
+        iOS: iosDetails,
       );
 
-      await _notificationsPlugin.zonedSchedule(
-        id: 0,
-        title: 'Giữ vững chuỗi Streak luyện tập! 🔥',
-        body: 'Đã đến giờ luyện nói tiếng Anh hôm nay rồi. Dành 15 phút để nâng cao phát âm nhé!',
-        scheduledDate: scheduledDate,
-        notificationDetails: notificationDetails,
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        matchDateTimeComponents: DateTimeComponents.time,
-      );
+      try {
+        await _notificationsPlugin.zonedSchedule(
+          id: 0,
+          title: 'Đến giờ luyện phát âm tiếng Anh rồi! 🔥',
+          body: 'Duy trì chuỗi Streak hôm nay bằng 15 phút luyện chuẩn âm vị nhé!',
+          scheduledDate: scheduledDate,
+          notificationDetails: notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      } on PlatformException catch (pe) {
+        if (kDebugMode) print('PlatformException scheduling reminder, retrying inexact: $pe');
+        await _notificationsPlugin.zonedSchedule(
+          id: 0,
+          title: 'Đến giờ luyện phát âm tiếng Anh rồi! 🔥',
+          body: 'Duy trì chuỗi Streak hôm nay bằng 15 phút luyện chuẩn âm vị nhé!',
+          scheduledDate: scheduledDate,
+          notificationDetails: notificationDetails,
+          androidScheduleMode: AndroidScheduleMode.inexact,
+          matchDateTimeComponents: DateTimeComponents.time,
+        );
+      }
 
       if (kDebugMode) {
-        print('Scheduled daily reminder for: $scheduledDate (Hour: $hour, Min: $minute)');
+        print('Scheduled daily study reminder at $hour:$minute');
       }
     } catch (e) {
-      if (kDebugMode) print('Error scheduling reminder: $e');
+      if (kDebugMode) print('Error scheduling notification: $e');
     }
   }
 
   /// Cancel daily reminder notification
   Future<void> cancelDailyReminder() async {
+    if (kIsWeb) return;
     try {
       await _notificationsPlugin.cancel(id: 0);
     } catch (_) {}
@@ -134,6 +154,10 @@ class NotificationService {
 
   /// Trigger an immediate demonstration notification
   Future<void> showInstantTestNotification() async {
+    if (kIsWeb) {
+      if (kDebugMode) print('Web test notification simulated');
+      return;
+    }
     try {
       await init();
       const androidDetails = AndroidNotificationDetails(

@@ -23,9 +23,9 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  List<WeakPhonemeModel> _allPhonemes = [];
-  List<PracticeSessionModel> _recentSessions = [];
-  bool _isLoading = true;
+  List<WeakPhonemeModel> _allPhonemes = DatabaseHelper.initialWeakPhonemes;
+  List<PracticeSessionModel> _recentSessions = DatabaseHelper.initialPracticeSessions;
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -34,17 +34,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    final db = DatabaseHelper.instance;
-    final phonemes = await db.getAllWeakPhonemes();
-    final sessions = await db.getRecentSessions(limit: 10);
+    try {
+      final db = DatabaseHelper.instance;
+      final phonemes = await db.getAllWeakPhonemes();
+      final sessions = await db.getRecentSessions(limit: 10);
 
-    if (mounted) {
-      setState(() {
-        _allPhonemes = phonemes;
-        _recentSessions = sessions;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _allPhonemes = phonemes;
+          _recentSessions = sessions;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -153,7 +158,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 const SizedBox(height: AppSpacing.md),
 
-                if (_isLoading)
+                if (_isLoading && _allPhonemes.isEmpty)
                   const Center(child: CircularProgressIndicator())
                 else if (_allPhonemes.isEmpty)
                   Container(
@@ -372,4 +377,3 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 }
-

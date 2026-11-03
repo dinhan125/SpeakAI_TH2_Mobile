@@ -21,7 +21,7 @@ class WeeklyStudyChart extends StatelessWidget {
 
     double maxMinutes = 20.0;
     for (final log in past7DaysLogs) {
-      final mins = log.studySeconds / 60.0;
+      final mins = (log.studySeconds / 60.0).roundToDouble();
       if (mins > maxMinutes) {
         maxMinutes = mins + 5;
       }
@@ -30,7 +30,7 @@ class WeeklyStudyChart extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.surfaceLight, // Nền thẻ màu trắng #FFFFFF
+        color: AppColors.surfaceLight,
         borderRadius: BorderRadius.circular(AppSpacing.radiusXl),
         boxShadow: AppSpacing.cardShadow,
       ),
@@ -50,7 +50,7 @@ class WeeklyStudyChart extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primarySoft, // Nền #EEF2FF
+                  color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
                 ),
                 child: const Text(
@@ -58,7 +58,7 @@ class WeeklyStudyChart extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF4F46E5), // Chữ #4F46E5
+                    color: Color(0xFF4F46E5),
                   ),
                 ),
               ),
@@ -76,7 +76,7 @@ class WeeklyStudyChart extends StatelessWidget {
                           width: 48,
                           height: 48,
                           decoration: const BoxDecoration(
-                            color: Color(0xFFEEF2FF), // Vòng tròn pastel #EEF2FF 48px
+                            color: Color(0xFFEEF2FF),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -90,8 +90,8 @@ class WeeklyStudyChart extends StatelessWidget {
                           'Chưa có dữ liệu học tập 7 ngày qua',
                           style: TextStyle(
                             fontSize: 13,
-                            color: AppColors.textSecondaryLight,
-                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF475569),
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
@@ -101,6 +101,25 @@ class WeeklyStudyChart extends StatelessWidget {
                     BarChartData(
                       maxY: maxMinutes,
                       alignment: BarChartAlignment.spaceAround,
+                      barTouchData: BarTouchData(
+                        enabled: true,
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipColor: (_) => const Color(0xFF1E1B4B),
+                          getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                            if (group.x < 0 || group.x >= past7DaysLogs.length) return null;
+                            final log = past7DaysLogs[group.x];
+                            final mins = (log.studySeconds / 60.0).round();
+                            return BarTooltipItem(
+                              '$mins phút',
+                              const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                       gridData: FlGridData(
                         show: true,
                         drawVerticalLine: false,
@@ -128,7 +147,8 @@ class WeeklyStudyChart extends StatelessWidget {
                                 '${value.toInt()}',
                                 style: const TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.textSecondaryLight,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF334155),
                                 ),
                               );
                             },
@@ -155,10 +175,10 @@ class WeeklyStudyChart extends StatelessWidget {
                                   label,
                                   style: TextStyle(
                                     fontSize: 11,
-                                    fontWeight: isToday ? FontWeight.w800 : FontWeight.w500,
+                                    fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
                                     color: isToday
-                                        ? AppColors.primary
-                                        : AppColors.textSecondaryLight,
+                                        ? const Color(0xFF4338CA)
+                                        : const Color(0xFF334155),
                                   ),
                                 ),
                               );
@@ -169,7 +189,7 @@ class WeeklyStudyChart extends StatelessWidget {
                       borderData: FlBorderData(show: false),
                       barGroups: List.generate(past7DaysLogs.length, (index) {
                         final log = past7DaysLogs[index];
-                        final minutes = log.studySeconds / 60.0;
+                        final minutes = (log.studySeconds / 60.0).roundToDouble();
                         final isToday = (log.date == todayIso);
 
                         return BarChartGroupData(
@@ -179,10 +199,10 @@ class WeeklyStudyChart extends StatelessWidget {
                               toY: minutes,
                               gradient: isToday
                                   ? AppColors.vibrantGradient
-                                  : LinearGradient(
+                                  : const LinearGradient(
                                       colors: [
-                                        AppColors.primaryLight.withValues(alpha: 0.35),
-                                        AppColors.primaryLight.withValues(alpha: 0.6),
+                                        Color(0xFF818CF8),
+                                        Color(0xFF6366F1),
                                       ],
                                       begin: Alignment.bottomCenter,
                                       end: Alignment.topCenter,

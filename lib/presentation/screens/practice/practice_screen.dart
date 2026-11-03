@@ -151,6 +151,75 @@ class _PracticeScreenState extends State<PracticeScreen> {
     );
   }
 
+  Future<void> _showCustomPracticeDialog() async {
+    final controller = TextEditingController();
+    String? errorText;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Custom Practice'),
+          content: SizedBox(
+            width: 480,
+            child: TextField(
+              controller: controller,
+              autofocus: true,
+              minLines: 5,
+              maxLines: 10,
+              textCapitalization: TextCapitalization.sentences,
+              keyboardType: TextInputType.multiline,
+              decoration: InputDecoration(
+                hintText: 'Enter an English sentence or paste a passage here...',
+                helperText: 'Long passages are split into sentences for practice.',
+                errorText: errorText,
+                alignLabelWithHint: true,
+                filled: true,
+                fillColor: AppColors.backgroundLight,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusMd),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton.icon(
+              onPressed: () {
+                controller.clear();
+                setDialogState(() => errorText = null);
+              },
+              icon: const Icon(Icons.delete_outline_rounded),
+              label: const Text('Clear'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            FilledButton.icon(
+              onPressed: () {
+                final input = controller.text.trim();
+                if (input.isEmpty) {
+                  setDialogState(() => errorText = 'Please enter a sentence or passage.');
+                  return;
+                }
+                final sentences = input
+                    .replaceAll(RegExp(r'\s+'), ' ')
+                    .split(RegExp(r'(?<=[.!?])\s+'))
+                    .map((sentence) => sentence.trim())
+                    .where((sentence) => sentence.isNotEmpty)
+                    .toList();
+                context.read<PracticeProvider>().startCustomPractice(sentences);
+                Navigator.pop(dialogContext);
+              },
+              icon: const Icon(Icons.mic_rounded),
+              label: const Text('Start Practice'),
+            ),
+          ],
+        ),
+      ),
+    );
+    controller.dispose();
+  }
+
   void _showSentenceSelector() {
     final practice = context.read<PracticeProvider>();
     showModalBottomSheet(
@@ -300,6 +369,28 @@ class _PracticeScreenState extends State<PracticeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight,
+                  borderRadius: BorderRadius.circular(AppSpacing.radiusLg),
+                  border: Border.all(color: AppColors.borderLight),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.edit_note_rounded, color: AppColors.primary),
+                    const SizedBox(width: AppSpacing.sm),
+                    const Expanded(
+                      child: Text('Practice with your own sentence or passage', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    ),
+                    TextButton(
+                      onPressed: _showCustomPracticeDialog,
+                      child: const Text('Custom Practice'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
               // 1. Navigation & Progress Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

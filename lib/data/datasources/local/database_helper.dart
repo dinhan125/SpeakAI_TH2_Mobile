@@ -32,20 +32,7 @@ class DatabaseHelper {
   Future<Database> _initDatabase() async {
     if (kIsWeb) {
       databaseFactory = databaseFactoryFfiWeb;
-      try {
-        return await openDatabase(
-          'speakai_app.db',
-          version: 2,
-          onCreate: _onCreate,
-          onUpgrade: _onUpgrade,
-        ).timeout(
-          const Duration(seconds: 4),
-          onTimeout: () => databaseFactoryFfiWeb.openDatabase(inMemoryDatabasePath),
-        );
-      } catch (e) {
-        if (kDebugMode) print('Web SQLite init fallback: $e');
-        return await databaseFactoryFfiWeb.openDatabase(inMemoryDatabasePath);
-      }
+      return await _initWebDatabase();
     }
 
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
@@ -71,10 +58,49 @@ class DatabaseHelper {
     }
   }
 
+  Future<Database> _initWebDatabase() async {
+    Database db;
+    try {
+      db = await databaseFactoryFfiWeb.openDatabase(
+        'speakai_app.db',
+        options: OpenDatabaseOptions(
+          version: 2,
+          onCreate: _onCreate,
+          onUpgrade: _onUpgrade,
+        ),
+      ).timeout(const Duration(seconds: 5));
+    } catch (e) {
+      if (kDebugMode) print('Web SQLite openDatabase fallback to inMemory: $e');
+      db = await databaseFactoryFfiWeb.openDatabase(
+        inMemoryDatabasePath,
+        options: OpenDatabaseOptions(
+          version: 2,
+          onCreate: _onCreate,
+          onUpgrade: _onUpgrade,
+        ),
+      );
+    }
+
+    try {
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='users'",
+      );
+      if (tables.isEmpty) {
+        await _onCreate(db, 2);
+      }
+    } catch (_) {
+      try {
+        await _onCreate(db, 2);
+      } catch (_) {}
+    }
+
+    return db;
+  }
+
   Future<void> _onCreate(Database db, int version) async {
     // 1. Table users
     await db.execute('''
-      CREATE TABLE users (
+      CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         full_name TEXT NOT NULL,
         daily_goal_minutes INTEGER NOT NULL DEFAULT 15,
@@ -89,7 +115,7 @@ class DatabaseHelper {
 
     // 2. Table sentences
     await db.execute('''
-      CREATE TABLE sentences (
+      CREATE TABLE IF NOT EXISTS sentences (
         id TEXT PRIMARY KEY,
         text TEXT NOT NULL,
         ipa_transcription TEXT NOT NULL,
@@ -103,7 +129,7 @@ class DatabaseHelper {
 
     // 3. Table practice_sessions
     await db.execute('''
-      CREATE TABLE practice_sessions (
+      CREATE TABLE IF NOT EXISTS practice_sessions (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         sentence_id TEXT NOT NULL,
@@ -120,7 +146,7 @@ class DatabaseHelper {
 
     // 4. Table phoneme_assessments
     await db.execute('''
-      CREATE TABLE phoneme_assessments (
+      CREATE TABLE IF NOT EXISTS phoneme_assessments (
         id TEXT PRIMARY KEY,
         session_id TEXT NOT NULL,
         word TEXT NOT NULL,
@@ -133,7 +159,7 @@ class DatabaseHelper {
 
     // 5. Table daily_logs
     await db.execute('''
-      CREATE TABLE daily_logs (
+      CREATE TABLE IF NOT EXISTS daily_logs (
         id TEXT PRIMARY KEY,
         user_id TEXT NOT NULL,
         date TEXT NOT NULL,
@@ -146,7 +172,7 @@ class DatabaseHelper {
 
     // 6. Table weak_phonemes
     await db.execute('''
-      CREATE TABLE weak_phonemes (
+      CREATE TABLE IF NOT EXISTS weak_phonemes (
         phoneme TEXT PRIMARY KEY,
         total_attempts INTEGER NOT NULL DEFAULT 0,
         average_score REAL NOT NULL DEFAULT 0.0,
@@ -193,44 +219,26 @@ class DatabaseHelper {
   }
 
   Future<void> _seedDatabase(Database db) async {
+    final batch = db.batch();
+
     // Insert default user
     final user = SampleData.defaultUser;
-    await db.insert('users', user.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    batch.insert('users', user.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
 
     // Insert curated sentences
     for (final sentence in SampleData.initialSentences) {
-      await db.insert('sentences', sentence.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      batch.insert('sentences', sentence.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
     // Insert curriculum seed exercises
-    await _seedCurriculum(db);
+    for (final ex in CurriculumSeedData.allExercises) {
+      batch.insert('exercises', ex.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    }
 
     // Seed initial weak phonemes
-    final initialWeak = [
-      WeakPhonemeModel(
-        phoneme: 'θ',
-        totalAttempts: 5,
-        averageScore: 48.0,
-        needPractice: true,
-        lastUpdated: DateTimeHelper.todayIso(),
-      ),
-      WeakPhonemeModel(
-        phoneme: 'ʃ',
-        totalAttempts: 4,
-        averageScore: 55.0,
-        needPractice: true,
-        lastUpdated: DateTimeHelper.todayIso(),
-      ),
-      WeakPhonemeModel(
-        phoneme: 'ð',
-        totalAttempts: 3,
-        averageScore: 62.0,
-        needPractice: true,
-        lastUpdated: DateTimeHelper.todayIso(),
-      ),
-    ];
+    final initialWeak = _initialWeakPhonemesList();
     for (final item in initialWeak) {
-      await db.insert('weak_phonemes', item.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      batch.insert('weak_phonemes', item.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
     }
 
     // Seed recent 7 days activity
@@ -241,7 +249,7 @@ class DatabaseHelper {
       final seconds = (i == 0) ? 420 : (600 + (i * 135) % 450);
       final isGoalMet = seconds >= (user.dailyGoalMinutes * 60);
 
-      await db.insert('daily_logs', {
+      batch.insert('daily_logs', {
         'id': 'log_$dateIso',
         'user_id': user.id,
         'date': dateIso,
@@ -250,12 +258,85 @@ class DatabaseHelper {
         'sessions_count': (seconds / 90).ceil(),
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
+
+    // Seed initial practice history
+    for (final session in _initialPracticeSessionsList()) {
+      batch.insert(
+        'practice_sessions',
+        session.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
+    await batch.commit(noResult: true);
+  }
+
+  /// Public getters for seed/fallback data, enabling instant zero-latency UI rendering
+  static List<WeakPhonemeModel> get initialWeakPhonemes => _initialWeakPhonemesList();
+  static List<PracticeSessionModel> get initialPracticeSessions => _initialPracticeSessionsList();
+
+  static List<WeakPhonemeModel> _initialWeakPhonemesList() => [
+    WeakPhonemeModel(
+      phoneme: 'θ',
+      totalAttempts: 5,
+      averageScore: 48.0,
+      needPractice: true,
+      lastUpdated: DateTimeHelper.todayIso(),
+    ),
+    WeakPhonemeModel(
+      phoneme: 'ʃ',
+      totalAttempts: 4,
+      averageScore: 55.0,
+      needPractice: true,
+      lastUpdated: DateTimeHelper.todayIso(),
+    ),
+    WeakPhonemeModel(
+      phoneme: 'ð',
+      totalAttempts: 3,
+      averageScore: 62.0,
+      needPractice: true,
+      lastUpdated: DateTimeHelper.todayIso(),
+    ),
+  ];
+
+  static List<PracticeSessionModel> _initialPracticeSessionsList() {
+    final now = DateTime.now();
+    return [
+      PracticeSessionModel(
+        id: 'session_init_1',
+        userId: AppConstants.defaultUserId,
+        sentenceId: 'sen_2',
+        userAudioPath: null,
+        overallScore: 82.5,
+        accuracyScore: 80.0,
+        fluencyScore: 86.0,
+        completenessScore: 100.0,
+        wordDetails: [],
+        durationSeconds: 120,
+        createdAt: now.subtract(const Duration(hours: 3)),
+      ),
+      PracticeSessionModel(
+        id: 'session_init_2',
+        userId: AppConstants.defaultUserId,
+        sentenceId: 'sen_1',
+        userAudioPath: null,
+        overallScore: 78.0,
+        accuracyScore: 74.0,
+        fluencyScore: 82.0,
+        completenessScore: 100.0,
+        wordDetails: [],
+        durationSeconds: 95,
+        createdAt: now.subtract(const Duration(days: 1, hours: 2)),
+      ),
+    ];
   }
 
   Future<void> _seedCurriculum(Database db) async {
+    final batch = db.batch();
     for (final ex in CurriculumSeedData.allExercises) {
-      await db.insert('exercises', ex.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      batch.insert('exercises', ex.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
     }
+    await batch.commit(noResult: true);
   }
 
   // ================= EXERCISES & CURRICULUM =================
@@ -371,30 +452,40 @@ class DatabaseHelper {
   // ================= USERS CRUD =================
 
   Future<UserModel> getUser(String userId) async {
-    final db = await database;
-    final maps = await db.query(
-      'users',
-      where: 'id = ?',
-      whereArgs: [userId],
-      limit: 1,
-    );
+    try {
+      final db = await database;
+      final maps = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [userId],
+        limit: 1,
+      );
 
-    if (maps.isNotEmpty) {
-      return UserModel.fromMap(maps.first);
+      if (maps.isNotEmpty) {
+        return UserModel.fromMap(maps.first);
+      }
+      final user = SampleData.defaultUser;
+      await db.insert('users', user.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+      return user;
+    } catch (e) {
+      if (kDebugMode) print('getUser error: $e');
+      return SampleData.defaultUser;
     }
-    final user = SampleData.defaultUser;
-    await db.insert('users', user.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-    return user;
   }
 
   Future<int> updateUser(UserModel user) async {
-    final db = await database;
-    return await db.update(
-      'users',
-      user.toMap(),
-      where: 'id = ?',
-      whereArgs: [user.id],
-    );
+    try {
+      final db = await database;
+      return await db.update(
+        'users',
+        user.toMap(),
+        where: 'id = ?',
+        whereArgs: [user.id],
+      );
+    } catch (e) {
+      if (kDebugMode) print('updateUser error: $e');
+      return 0;
+    }
   }
 
   // ================= SENTENCES CRUD =================
@@ -414,15 +505,19 @@ class DatabaseHelper {
   }
 
   Future<SentenceModel?> getSentenceById(String id) async {
-    final db = await database;
-    final maps = await db.query(
-      'sentences',
-      where: 'id = ?',
-      whereArgs: [id],
-      limit: 1,
-    );
-    if (maps.isNotEmpty) {
-      return SentenceModel.fromMap(maps.first);
+    try {
+      final db = await database;
+      final maps = await db.query(
+        'sentences',
+        where: 'id = ?',
+        whereArgs: [id],
+        limit: 1,
+      );
+      if (maps.isNotEmpty) {
+        return SentenceModel.fromMap(maps.first);
+      }
+    } catch (e) {
+      if (kDebugMode) print('getSentenceById error: $e');
     }
     return null;
   }
@@ -453,27 +548,38 @@ class DatabaseHelper {
   }
 
   Future<List<PracticeSessionModel>> getRecentSessions({int limit = 20}) async {
-    final db = await database;
-    final maps = await db.query(
-      'practice_sessions',
-      orderBy: 'created_at DESC',
-      limit: limit,
-    );
-    return maps.map((m) => PracticeSessionModel.fromMap(m)).toList();
+    try {
+      final db = await database;
+      final maps = await db.query(
+        'practice_sessions',
+        orderBy: 'created_at DESC',
+        limit: limit,
+      );
+      if (maps.isNotEmpty) {
+        return maps.map((m) => PracticeSessionModel.fromMap(m)).toList();
+      }
+    } catch (e) {
+      if (kDebugMode) print('getRecentSessions error: $e');
+    }
+    return _initialPracticeSessionsList();
   }
 
   // ================= DAILY LOGS & STREAK =================
 
   Future<DailyLogModel?> getDailyLog(String userId, String dateIso) async {
-    final db = await database;
-    final maps = await db.query(
-      'daily_logs',
-      where: 'user_id = ? AND date = ?',
-      whereArgs: [userId, dateIso],
-      limit: 1,
-    );
-    if (maps.isNotEmpty) {
-      return DailyLogModel.fromMap(maps.first);
+    try {
+      final db = await database;
+      final maps = await db.query(
+        'daily_logs',
+        where: 'user_id = ? AND date = ?',
+        whereArgs: [userId, dateIso],
+        limit: 1,
+      );
+      if (maps.isNotEmpty) {
+        return DailyLogModel.fromMap(maps.first);
+      }
+    } catch (e) {
+      if (kDebugMode) print('getDailyLog error: $e');
     }
     return null;
   }
@@ -490,43 +596,85 @@ class DatabaseHelper {
       isGoalMet: false,
       sessionsCount: 0,
     );
-    final db = await database;
-    await db.insert(
-      'daily_logs',
-      newLog.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    try {
+      final db = await database;
+      await db.insert(
+        'daily_logs',
+        newLog.toMap(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (e) {
+      if (kDebugMode) print('getOrCreateDailyLog insert error: $e');
+    }
     return newLog;
   }
 
   Future<int> updateDailyLog(DailyLogModel log) async {
-    final db = await database;
-    return await db.update(
-      'daily_logs',
-      log.toMap(),
-      where: 'id = ?',
-      whereArgs: [log.id],
-    );
+    try {
+      final db = await database;
+      return await db.update(
+        'daily_logs',
+        log.toMap(),
+        where: 'id = ?',
+        whereArgs: [log.id],
+      );
+    } catch (e) {
+      if (kDebugMode) print('updateDailyLog error: $e');
+      return 0;
+    }
   }
 
   Future<List<DailyLogModel>> getPast7DaysLogs(String userId) async {
-    final pastDays = DateTimeHelper.getPast7Days();
-    final List<DailyLogModel> result = [];
+    try {
+      final pastDays = DateTimeHelper.getPast7Days();
+      final List<DailyLogModel> result = [];
 
-    for (final day in pastDays) {
-      final iso = DateTimeHelper.toIsoDate(day);
-      final log = await getOrCreateDailyLog(userId, iso);
-      result.add(log);
+      for (final day in pastDays) {
+        final iso = DateTimeHelper.toIsoDate(day);
+        final log = await getOrCreateDailyLog(userId, iso);
+        result.add(log);
+      }
+      if (result.isNotEmpty) {
+        return result;
+      }
+    } catch (e) {
+      if (kDebugMode) print('getPast7DaysLogs error: $e');
     }
-    return result;
+    return _generateDefaultPast7Days(userId);
+  }
+
+  static List<DailyLogModel> _generateDefaultPast7Days(String userId) {
+    final now = DateTime.now();
+    final logs = <DailyLogModel>[];
+    for (int i = 6; i >= 0; i--) {
+      final d = now.subtract(Duration(days: i));
+      final iso = DateTimeHelper.toIsoDate(d);
+      final seconds = (i == 0) ? 420 : (600 + (i * 135) % 450);
+      logs.add(DailyLogModel(
+        id: 'log_$iso',
+        userId: userId,
+        date: iso,
+        studySeconds: seconds,
+        isGoalMet: seconds >= 900,
+        sessionsCount: (seconds / 90).ceil(),
+      ));
+    }
+    return logs;
   }
 
   // ================= WEAK PHONEMES =================
 
   Future<List<WeakPhonemeModel>> getAllWeakPhonemes() async {
-    final db = await database;
-    final maps = await db.query('weak_phonemes', orderBy: 'average_score ASC');
-    return maps.map((m) => WeakPhonemeModel.fromMap(m)).toList();
+    try {
+      final db = await database;
+      final maps = await db.query('weak_phonemes', orderBy: 'average_score ASC');
+      if (maps.isNotEmpty) {
+        return maps.map((m) => WeakPhonemeModel.fromMap(m)).toList();
+      }
+    } catch (e) {
+      if (kDebugMode) print('getAllWeakPhonemes error: $e');
+    }
+    return _initialWeakPhonemesList();
   }
 
   Future<List<WeakPhonemeModel>> getTopWeakPhonemes({int limit = 3}) async {
@@ -538,57 +686,13 @@ class DatabaseHelper {
         orderBy: 'average_score ASC',
         limit: limit,
       );
-      if (maps.isEmpty) {
-        return [
-          WeakPhonemeModel(
-            phoneme: 'θ',
-            totalAttempts: 5,
-            averageScore: 48.0,
-            needPractice: true,
-            lastUpdated: DateTimeHelper.todayIso(),
-          ),
-          WeakPhonemeModel(
-            phoneme: 'ʃ',
-            totalAttempts: 4,
-            averageScore: 55.0,
-            needPractice: true,
-            lastUpdated: DateTimeHelper.todayIso(),
-          ),
-          WeakPhonemeModel(
-            phoneme: 'ð',
-            totalAttempts: 3,
-            averageScore: 62.0,
-            needPractice: true,
-            lastUpdated: DateTimeHelper.todayIso(),
-          ),
-        ];
+      if (maps.isNotEmpty) {
+        return maps.map((m) => WeakPhonemeModel.fromMap(m)).toList();
       }
-      return maps.map((m) => WeakPhonemeModel.fromMap(m)).toList();
     } catch (e) {
-      return [
-        WeakPhonemeModel(
-          phoneme: 'θ',
-          totalAttempts: 5,
-          averageScore: 48.0,
-          needPractice: true,
-          lastUpdated: DateTimeHelper.todayIso(),
-        ),
-        WeakPhonemeModel(
-          phoneme: 'ʃ',
-          totalAttempts: 4,
-          averageScore: 55.0,
-          needPractice: true,
-          lastUpdated: DateTimeHelper.todayIso(),
-        ),
-        WeakPhonemeModel(
-          phoneme: 'ð',
-          totalAttempts: 3,
-          averageScore: 62.0,
-          needPractice: true,
-          lastUpdated: DateTimeHelper.todayIso(),
-        ),
-      ];
+      if (kDebugMode) print('getTopWeakPhonemes error: $e');
     }
+    return _initialWeakPhonemesList();
   }
 
   Future<void> updatePhonemeScore(String phoneme, double currentScore) async {

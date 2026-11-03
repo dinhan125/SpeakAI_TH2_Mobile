@@ -21,6 +21,7 @@ class PracticeProvider extends ChangeNotifier {
   final GetRecommendationsUseCase _recommendationsUseCase;
 
   List<SentenceModel> _sentences = SampleData.initialSentences;
+  List<SentenceModel> _customSentences = [];
   List<SentenceModel> _recommendedSentences = SampleData.initialSentences.take(3).toList();
   SentenceModel? _currentSentence = SampleData.initialSentences.first;
 
@@ -43,7 +44,9 @@ class PracticeProvider extends ChangeNotifier {
     _recommendedSentences = SampleData.initialSentences.take(3).toList();
   }
 
-  List<SentenceModel> get sentences => _sentences;
+  List<SentenceModel> get sentences => _customSentences.any((sentence) => sentence.id == _currentSentence?.id)
+      ? _customSentences
+      : _sentences;
   List<SentenceModel> get recommendedSentences => _recommendedSentences;
   SentenceModel? get currentSentence => _currentSentence;
   bool get isLoading => _isLoading;
@@ -87,6 +90,21 @@ class PracticeProvider extends ChangeNotifier {
     _lastResult = null;
     _lastRecordedAudioPath = null;
     notifyListeners();
+  }
+
+  /// Start an in-memory custom practice session, keeping built-in exercises intact.
+  void startCustomPractice(List<String> texts) {
+    _customSentences = texts.asMap().entries.map((entry) {
+      return SentenceModel(
+        id: 'custom_${entry.key}_${DateTime.now().microsecondsSinceEpoch}',
+        text: entry.value,
+        ipaTranscription: '',
+        focusPhonemes: const [],
+        topic: 'Custom Practice',
+        translation: '',
+      );
+    }).toList();
+    if (_customSentences.isNotEmpty) selectSentence(_customSentences.first);
   }
 
   /// Refresh personalized recommendations based on weak phonemes
@@ -227,52 +245,68 @@ class PracticeProvider extends ChangeNotifier {
   }
 
   int get currentSentenceIndex {
-    if (_currentSentence == null || _sentences.isEmpty) return 0;
-    final idx = _sentences.indexWhere((s) => s.id == _currentSentence!.id);
+    final allSentences = sentences;
+    if (_currentSentence == null || allSentences.isEmpty) return 0;
+    final idx = allSentences.indexWhere((s) => s.id == _currentSentence!.id);
     return idx >= 0 ? idx : 0;
   }
 
-  int get totalSentencesCount => _sentences.length;
+  int get totalSentencesCount => sentences.length;
 
   void nextSentence() {
-    if (_sentences.isEmpty) return;
-    final nextIdx = (currentSentenceIndex + 1) % _sentences.length;
-    selectSentence(_sentences[nextIdx]);
+    final allSentences = sentences;
+    if (allSentences.isEmpty) return;
+    final nextIdx = (currentSentenceIndex + 1) % allSentences.length;
+    selectSentence(allSentences[nextIdx]);
   }
 
   void previousSentence() {
-    if (_sentences.isEmpty) return;
-    final prevIdx = (currentSentenceIndex - 1 + _sentences.length) % _sentences.length;
-    selectSentence(_sentences[prevIdx]);
+    final allSentences = sentences;
+    if (allSentences.isEmpty) return;
+    final prevIdx = (currentSentenceIndex - 1 + allSentences.length) % allSentences.length;
+    selectSentence(allSentences[prevIdx]);
+  }
+
+  Future<String> _getUserAccent() async {
+    try {
+      final user = await _dbHelper.getUser(AppConstants.defaultUserId);
+      return user.preferredAccent;
+    } catch (_) {
+      return AppConstants.defaultAccent;
+    }
   }
 
   /// Play native standard pronunciation at normal speed (1.0x)
-  Future<void> playSampleNativeAudio({String accent = 'en-US'}) async {
+  Future<void> playSampleNativeAudio({String? accent}) async {
     if (_currentSentence == null) return;
     _playbackSpeed = 1.0;
-    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: accent, speed: 1.0);
+    final target = accent ?? await _getUserAccent();
+    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: target, speed: 1.0);
     notifyListeners();
   }
 
   /// Play native pronunciation slowly (0.75x) for clear phoneme dissection
-  Future<void> playSampleNativeAudioSlow({String accent = 'en-US'}) async {
+  Future<void> playSampleNativeAudioSlow({String? accent}) async {
     if (_currentSentence == null) return;
     _playbackSpeed = 0.75;
-    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: accent, speed: 0.75);
+    final target = accent ?? await _getUserAccent();
+    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: target, speed: 0.75);
     notifyListeners();
   }
 
   /// Play native pronunciation very slowly (0.5x) with guaranteed clear audio and no cutoffs
-  Future<void> playSampleNativeAudioVerySlow({String accent = 'en-US'}) async {
+  Future<void> playSampleNativeAudioVerySlow({String? accent}) async {
     if (_currentSentence == null) return;
     _playbackSpeed = 0.5;
-    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: accent, speed: 0.5);
+    final target = accent ?? await _getUserAccent();
+    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: target, speed: 0.5);
     notifyListeners();
   }
 
   /// Play pronunciation of an individual word
-  Future<void> playSpecificWord(String word, {String accent = 'en-US'}) async {
-    await _player.speakNativeWithSpeed(word, accent: accent, speed: 0.85);
+  Future<void> playSpecificWord(String word, {String? accent}) async {
+    final target = accent ?? await _getUserAccent();
+    await _player.speakNativeWithSpeed(word, accent: target, speed: 0.85);
     notifyListeners();
   }
 
@@ -342,4 +376,3 @@ class PracticeProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-

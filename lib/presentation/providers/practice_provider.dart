@@ -246,33 +246,46 @@ class PracticeProvider extends ChangeNotifier {
     selectSentence(_sentences[prevIdx]);
   }
 
+  Future<String> _getUserAccent() async {
+    try {
+      final user = await _dbHelper.getUser(AppConstants.defaultUserId);
+      return user.preferredAccent;
+    } catch (_) {
+      return AppConstants.defaultAccent;
+    }
+  }
+
   /// Play native standard pronunciation at normal speed (1.0x)
-  Future<void> playSampleNativeAudio({String accent = 'en-US'}) async {
+  Future<void> playSampleNativeAudio({String? accent}) async {
     if (_currentSentence == null) return;
     _playbackSpeed = 1.0;
-    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: accent, speed: 1.0);
+    final target = accent ?? await _getUserAccent();
+    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: target, speed: 1.0);
     notifyListeners();
   }
 
   /// Play native pronunciation slowly (0.75x) for clear phoneme dissection
-  Future<void> playSampleNativeAudioSlow({String accent = 'en-US'}) async {
+  Future<void> playSampleNativeAudioSlow({String? accent}) async {
     if (_currentSentence == null) return;
     _playbackSpeed = 0.75;
-    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: accent, speed: 0.75);
+    final target = accent ?? await _getUserAccent();
+    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: target, speed: 0.75);
     notifyListeners();
   }
 
   /// Play native pronunciation very slowly (0.5x) with guaranteed clear audio and no cutoffs
-  Future<void> playSampleNativeAudioVerySlow({String accent = 'en-US'}) async {
+  Future<void> playSampleNativeAudioVerySlow({String? accent}) async {
     if (_currentSentence == null) return;
     _playbackSpeed = 0.5;
-    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: accent, speed: 0.5);
+    final target = accent ?? await _getUserAccent();
+    await _player.speakNativeWithSpeed(_currentSentence!.text, accent: target, speed: 0.5);
     notifyListeners();
   }
 
   /// Play pronunciation of an individual word
-  Future<void> playSpecificWord(String word, {String accent = 'en-US'}) async {
-    await _player.speakNativeWithSpeed(word, accent: accent, speed: 0.85);
+  Future<void> playSpecificWord(String word, {String? accent}) async {
+    final target = accent ?? await _getUserAccent();
+    await _player.speakNativeWithSpeed(word, accent: target, speed: 0.85);
     notifyListeners();
   }
 
@@ -342,4 +355,3 @@ class PracticeProvider extends ChangeNotifier {
     notifyListeners();
   }
 }
-

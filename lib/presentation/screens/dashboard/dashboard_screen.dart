@@ -211,28 +211,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Xin chào, ${user?.fullName ?? "Bạn học"} 👋',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: -0.5,
-                            color: AppColors.textPrimaryLight,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Xin chào, ${user?.fullName ?? "Bạn học"} 👋',
+                            style: theme.textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.5,
+                              color: AppColors.textPrimaryLight,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                        const SizedBox(height: 2),
-                        const Text(
-                          'Cùng rèn luyện chuẩn IPA hôm nay',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondaryLight,
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Cùng rèn luyện chuẩn IPA hôm nay',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondaryLight,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: AppSpacing.sm),
                     StreakFlameBadge(
                       streakDays: streakInfo?.currentStreak ?? 0,
                       longestStreak: streakInfo?.longestStreak ?? 0,
@@ -339,41 +346,49 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primarySoft,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                          ),
-                          child: const Icon(
-                            Icons.auto_awesome_rounded,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Bài tập gợi ý cho bạn',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
-                              ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primarySoft,
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
                             ),
-                            const Text(
-                              'Đề xuất rèn luyện âm vị cần cải thiện',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondaryLight,
-                              ),
+                            child: const Icon(
+                              Icons.auto_awesome_rounded,
+                              size: 16,
+                              color: AppColors.primary,
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Bài tập gợi ý cho bạn',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const Text(
+                                  'Đề xuất rèn luyện âm vị cần cải thiện',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     TextButton.icon(
                       onPressed: () {
@@ -407,43 +422,52 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            color: AppColors.streakOrangeBg,
-                            borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
-                            border: Border.all(color: AppColors.streakOrangeBorder, width: 0.8),
-                          ),
-                          child: const Icon(
-                            Icons.local_fire_department_rounded,
-                            size: 18,
-                            color: AppColors.streakOrangeText,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Kho bài tập phổ biến',
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 16,
-                              ),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.streakOrangeBg,
+                              borderRadius: BorderRadius.circular(AppSpacing.radiusSm),
+                              border: Border.all(color: AppColors.streakOrangeBorder, width: 0.8),
                             ),
-                            const Text(
-                              'Được cộng đồng SpeakAI luyện tập nhiều nhất',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondaryLight,
-                              ),
+                            child: const Icon(
+                              Icons.local_fire_department_rounded,
+                              size: 18,
+                              color: AppColors.streakOrangeText,
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Kho bài tập phổ biến',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 16,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const Text(
+                                  'Được cộng đồng SpeakAI luyện tập nhiều nhất',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondaryLight,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
